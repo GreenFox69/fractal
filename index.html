@@ -1,51 +1,54 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Множество Мандельброта</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Множество Мандельброта</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
 </head>
 <body>
-    <!-- Фоновые «пятна» цвета для эффекта стекла -->
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
-    <div class="blob blob-3"></div>
+  <main class="app">
+    <header class="topbar glass">
+      <a class="brand" href="#" aria-label="Множество Мандельброта">
+        <span class="brand-mark">✳</span><span>fract<span class="brand-accent">al</span></span>
+      </a>
+      <span class="topbar-note"><span class="status-dot"></span> Интерактивная визуализация</span>
+    </header>
 
-    <main class="app">
-        <header class="glass-panel title-panel">
-            <h1>Множество Мандельброта</h1>
-            <p class="subtitle">Интерактивная фрактальная визуализация</p>
-        </header>
+    <section class="intro">
+      <p class="eyebrow">КОМПЛЕКСНАЯ ПЛОСКОСТЬ</p>
+      <h1>Множество <span>Мандельброта</span></h1>
+      <p class="description">Бесконечная сложность в простой формуле. Исследуйте границы фрактала: прокручивайте колесо для масштаба и нажмите «Сбросить», чтобы вернуться.</p>
+    </section>
 
-        <section class="glass-panel canvas-panel">
-            <canvas id="fractal-canvas"></canvas>
-            <div id="hud" class="hud">Готово</div>
-        </section>
-
-        <section class="glass-panel controls-panel">
-            <div class="control-group">
-                <label for="iterations">
-                    Точность (итерации):
-                    <output id="iterations-value">128</output>
-                </label>
-                <input type="range" id="iterations" min="16" max="1024" step="8" value="128">
-            </div>
-
-            <div class="buttons">
-                <button id="btn-reset" class="glass-btn">Сброс вида</button>
-                <button id="btn-zoom-in" class="glass-btn">➕ Приблизить</button>
-                <button id="btn-zoom-out" class="glass-btn">➖ Отдалить</button>
-            </div>
-
-            <div class="hints">
-                <span>🖱 Колесо мыши — масштаб</span>
-                <span>🖱 Перетаскивание — перемещение</span>
-                <span>Двойной клик — приблизить к точке</span>
-            </div>
-        </section>
-    </main>
-
-    <script src="script.js"></script>
+    <section class="workspace glass" aria-label="Настройки и изображение фрактала">
+      <div class="toolbar">
+        <div class="control-group">
+          <label for="iterations">
+            <span class="control-label">Точность отрисовки</span>
+            <span class="iteration-value"><output id="iterationValue">180</output> <small>итераций</small></span>
+          </label>
+          <input id="iterations" type="range" min="40" max="600" step="10" value="180">
+          <div class="range-labels"><span>Быстрее</span><span>Детальнее</span></div>
+        </div>
+        <div class="toolbar-actions">
+          <span class="zoom-readout">Масштаб <strong id="zoomValue">1.00×</strong></span>
+          <button id="resetButton" class="reset-button" type="button"><span aria-hidden="true">↺</span> Сбросить</button>
+        </div>
+      </div>
+      <div class="canvas-frame">
+        <canvas id="fractal" aria-label="Визуализация множества Мандельброта">Ваш браузер не поддерживает элемент canvas.</canvas>
+        <div id="loading" class="loading" aria-live="polite">Вычисляем фрактал…</div>
+        <div class="canvas-hint"><span>⌖</span> Колесо мыши — масштаб</div>
+      </div>
+      <footer class="workspace-footer">
+        <span><i class="legend-dot"></i> Внутри множества</span>
+        <span class="formula">z<sub>n+1</sub> = z<sub>n</sub><sup>2</sup> + c</span>
+        <span>c = x + yi</span>
+      </footer>
+    </section>
+    <footer class="page-footer">Создано для любопытства <span>✦</span></footer>
+  </main>
 </body>
 </html>
