@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Множество Мандельброта</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Фоновые «пятна» цвета для эффекта стекла -->
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+
+    <main class="app">
+        <header class="glass-panel title-panel">
+            <h1>Множество Мандельброта</h1>
+            <p class="subtitle">Интерактивная фрактальная визуализация</p>
+        </header>
+
+        <section class="glass-panel canvas-panel">
+            <canvas id="fractal-canvas"></canvas>
+            <div id="hud" class="hud">Готово</div>
+        </section>
+
+        <section class="glass-panel controls-panel">
+            <div class="control-group">
+                <label for="iterations">
+                    Точность (итерации):
+                    <output id="iterations-value">128</output>
+                </label>
+                <input type="range" id="iterations" min="16" max="1024" step="8" value="128">
+            </div>
+
+            <div class="buttons">
+                <button id="btn-reset" class="glass-btn">Сброс вида</button>
+                <button id="btn-zoom-in" class="glass-btn">➕ Приблизить</button>
+                <button id="btn-zoom-out" class="glass-btn">➖ Отдалить</button>
+            </div>
+
+            <div class="hints">
+                <span>🖱 Колесо мыши — масштаб</span>
+                <span>🖱 Перетаскивание — перемещение</span>
+                <span>Двойной клик — приблизить к точке</span>
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
