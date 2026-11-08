@@ -1,256 +1,146 @@
-/* =========================================================
-   Фрактал Мандельброта — логика вычислений и отрисовки
-   Запуск: python3 -m http.server 8000 --bind 127.0.0.1
-   Затем открыть http://127.0.0.1:8000
-   ========================================================= */
+const canvas = document.querySelector("#fractal");
+const ctx = canvas.getContext("2d", { alpha: false });
+const slider = document.querySelector("#iterations");
+const iterationValue = document.querySelector("#iterationValue");
+const zoomValue = document.querySelector("#zoomValue");
+const resetButton = document.querySelector("#resetButton");
+const loading = document.querySelector("#loading");
 
-(() => {
-    "use strict";
+const view = { centerX: -0.5, centerY: 0, span: 3.5 };
+let maxIterations = Number(slider.value);
+let renderRequest = 0;
 
-    const canvas = document.getElementById("fractal-canvas");
-    const ctx = canvas.getContext("2d", { alpha: false });
-    const hud = document.getElementById("hud");
+const palette = Array.from({ length: 256 }, (_, i) => {
+  const t = i / 255;
+  return [
+    Math.round(9 + 30 * Math.sin(t * 6.2 + 0.2) ** 2 + 78 * t ** 2),
+    Math.round(10 + 22 * Math.sin(t * 6.2 + 2.1) ** 2 + 49 * t),
+    Math.round(24 + 48 * Math.sin(t * 6.2 + 4.1) ** 2 + 130 * t),
+  ];
+});
 
-    const slider = document.getElementById("iterations");
-    const sliderOutput = document.getElementById("iterations-value");
-    const btnReset = document.getElementById("btn-reset");
-    const btnZoomIn = document.getElementById("btn-zoom-in");
-    const btnZoomOut = document.getElementById("btn-zoom-out");
+function resizeCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+  const width = Math.max(1, Math.round(rect.width * pixelRatio));
+  const height = Math.max(1, Math.round(rect.height * pixelRatio));
 
-    // --- Вид (комплексная плоскость) ---
-    const DEFAULT_VIEW = { cx: -0.6, cy: 0.0, scale: 3.2 }; // scale = ширина в комплексных единицах
-    let view = { ...DEFAULT_VIEW };
-
-    let maxIterations = parseInt(slider.value, 10);
-
-    // --- Палитра цветов (предвычислим LUT для скорости) ---
-    const PALETTE_SIZE = 2048;
-    const palette = new Uint8ClampedArray(PALETTE_SIZE * 3);
-    (function buildPalette() {
-        for (let i = 0; i < PALETTE_SIZE; i++) {
-            const t = i / PALETTE_SIZE;
-            // Красивый градиент: тёмно-синий -> фиолетовый -> розовый -> оранжевый -> белый
-            const r = Math.floor(255 * Math.min(1, 4.2 * t));
-            const g = Math.floor(255 * Math.max(0, Math.min(1, 4.2 * t - 1.1)));
-            const b = Math.floor(255 * (0.5 + 0.5 * Math.cos(2 * Math.PI * t)) * Math.min(1, 1.6 * t + 0.15));
-            palette[i * 3] = r;
-            palette[i * 3 + 1] = g;
-            palette[i * 3 + 2] = b === 0 ? 40 : b; // лёгкий синий оттенок у тёмных тонов
-        }
-    })();
-
-    // --- Размер канваса (с учётом DPR, но ограничим для производительности) ---
-    function resizeCanvas() {
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        const rect = canvas.getBoundingClientRect();
-        canvas.width = Math.round(rect.width * dpr);
-        canvas.height = Math.round(rect.height * dpr);
-    }
-
-    // --- Ядро: значение итерации для одной точки (smooth iteration) ---
-    function mandelIter(cxr, cyi) {
-        let zr = 0, zi = 0;
-        let zr2 = 0, zi2 = 0;
-        let iter = 0;
-
-        while (zr2 + zi2 <= 4 && iter < maxIterations) {
-            zi = 2 * zr * zi + cyi;
-            zr = zr2 - zi2 + cxr;
-            zr2 = zr * zr;
-            zi2 = zi * zi;
-            iter++;
-        }
-
-        if (iter >= maxIterations) return -1; // точка внутри множества
-
-        // Сглаживание: нормализованная «непрерывная» итерация
-        const logZn = Math.log(zr2 + zi2) / 2;
-        const nu = Math.log(logZn / Math.LN2) / Math.LN2;
-        return iter + 1 - nu;
-    }
-
-    // --- Отрисовка построчно с дебаунсом и индикатором прогресса ---
-    let renderToken = 0;
-
-    async function render() {
-        const token = ++renderToken;
-        const w = canvas.width;
-        const h = canvas.height;
-
-        const aspect = w / h;
-        const scaleX = view.scale;
-        const scaleY = view.scale / aspect;
-
-        const x0 = view.cx - scaleX / 2;
-        const y0 = view.cy + scaleY / 2;
-
-        const img = ctx.createImageData(w, h);
-        const data = img.data;
-
-        const stepX = scaleX / w;
-        const stepY = scaleY / h;
-
-        const startTime = performance.now();
-        const CHUNK_ROWS = 8; // строк за кадр — интерфейс не подвисает
-
-        hud.style.opacity = "1";
-        hud.textContent = "Расчёт…";
-
-        for (let py = 0; py < h; py += CHUNK_ROWS) {
-            if (token !== renderToken) return; // новый рендер отменил этот
-
-            const yEnd = Math.min(py + CHUNK_ROWS, h);
-            for (let y = py; y < yEnd; y++) {
-                const cyi = y0 - y * stepY;
-                let idx = (y * w) * 4;
-                for (let x = 0; x < w; x++, idx += 4) {
-                    const cxr = x0 + x * stepX;
-                    const v = mandelIter(cxr, cyi);
-
-                    if (v === -1) {
-                        data[idx] = 5;
-                        data[idx + 1] = 5;
-                        data[idx + 2] = 12;
-                    } else {
-                        // Логарифмическое отображение итераций в индекс палитры
-                        const norm = Math.log(v + 1) / Math.log(maxIterations + 1);
-                        const p = Math.min(PALETTE_SIZE - 1, (norm * PALETTE_SIZE) | 0) * 3;
-                        data[idx] = palette[p];
-                        data[idx + 1] = palette[p + 1];
-                        data[idx + 2] = palette[p + 2];
-                    }
-                    data[idx + 3] = 255;
-                }
-            }
-
-            ctx.putImageData(img, 0, 0);
-
-            const pct = Math.round((yEnd / h) * 100);
-            hud.textContent = `Расчёт… ${pct}%`;
-            await new Promise(r => requestAnimationFrame(r));
-        }
-
-        if (token !== renderToken) return;
-        const ms = Math.round(performance.now() - startTime);
-        hud.textContent = `Итерации: ${maxIterations} • Zoom: ×${(DEFAULT_VIEW.scale / view.scale).toFixed(1)} • ${ms} мс`;
-    }
-
-    // --- Преобразование экранных координат в комплексные ---
-    function screenToComplex(px, py) {
-        const rect = canvas.getBoundingClientRect();
-        const dpr = canvas.width / rect.width;
-        const x = px * dpr;
-        const y = py * dpr;
-
-        const aspect = canvas.width / canvas.height;
-        const scaleX = view.scale;
-        const scaleY = view.scale / aspect;
-        const x0 = view.cx - scaleX / 2;
-        const y0 = view.cy + scaleY / 2;
-
-        return {
-            re: x0 + x * (scaleX / canvas.width),
-            im: y0 - y * (scaleY / canvas.height),
-        };
-    }
-
-    function zoomAt(factor, clientX, clientY) {
-        const rect = canvas.getBoundingClientRect();
-        const target = screenToComplex(clientX - rect.left, clientY - rect.top);
-
-        view.scale *= factor;
-        view.scale = Math.max(1e-13, Math.min(6, view.scale));
-
-        // Сохраняем точку под курсором на месте
-        view.cx = target.re + (view.cx - target.re) * factor;
-        view.cy = target.im + (view.cy - target.im) * factor;
-
-        scheduleRender();
-    }
-
-    // --- Дебаунс рендера ---
-    let renderTimer = null;
-    function scheduleRender(delay = 60) {
-        clearTimeout(renderTimer);
-        renderTimer = setTimeout(render, delay);
-    }
-
-    // --- События: ползунок ---
-    slider.addEventListener("input", () => {
-        maxIterations = parseInt(slider.value, 10);
-        sliderOutput.textContent = maxIterations;
-        scheduleRender(120);
-    });
-
-    // --- События: кнопки ---
-    btnReset.addEventListener("click", () => {
-        view = { ...DEFAULT_VIEW };
-        scheduleRender(0);
-    });
-
-    btnZoomIn.addEventListener("click", () => {
-        const rect = canvas.getBoundingClientRect();
-        zoomAt(0.6, rect.left + rect.width / 2, rect.top + rect.height / 2);
-    });
-
-    btnZoomOut.addEventListener("click", () => {
-        const rect = canvas.getBoundingClientRect();
-        zoomAt(1 / 0.6, rect.left + rect.width / 2, rect.top + rect.height / 2);
-    });
-
-    // --- Колесо мыши: масштаб к курсору ---
-    canvas.addEventListener("wheel", (e) => {
-        e.preventDefault();
-        const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
-        zoomAt(factor, e.clientX, e.clientY);
-    }, { passive: false });
-
-    // --- Двойной клик: приблизить к точке ---
-    canvas.addEventListener("dblclick", (e) => {
-        zoomAt(0.4, e.clientX, e.clientY);
-    });
-
-    // --- Перетаскивание: панорамирование ---
-    let dragging = false;
-    let lastX = 0, lastY = 0;
-
-    canvas.addEventListener("pointerdown", (e) => {
-        dragging = true;
-        lastX = e.clientX;
-        lastY = e.clientY;
-        canvas.setPointerCapture(e.pointerId);
-    });
-
-    canvas.addEventListener("pointermove", (e) => {
-        if (!dragging) return;
-        const rect = canvas.getBoundingClientRect();
-        const unitsPerPxX = view.scale / rect.width;
-        const unitsPerPxY = (view.scale / (canvas.width / canvas.height)) / rect.height;
-
-        view.cx -= (e.clientX - lastX) * unitsPerPxX;
-        view.cy += (e.clientY - lastY) * unitsPerPxY;
-        lastX = e.clientX;
-        lastY = e.clientY;
-
-        scheduleRender(30);
-    });
-
-    const endDrag = (e) => {
-        if (dragging) {
-            dragging = false;
-            try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
-        }
-    };
-    canvas.addEventListener("pointerup", endDrag);
-    canvas.addEventListener("pointercancel", endDrag);
-
-    // --- Ресайз окна ---
-    window.addEventListener("resize", () => {
-        resizeCanvas();
-        scheduleRender(150);
-    });
-
-    // --- Старт ---
-    resizeCanvas();
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
     render();
-})();
+  }
+}
+
+function render() {
+  const requestId = ++renderRequest;
+  const width = canvas.width;
+  const height = canvas.height;
+  if (!width || !height) return;
+
+  loading.classList.add("visible");
+  const image = ctx.createImageData(width, height);
+  const pixels = image.data;
+  const aspect = width / height;
+  const spanX = view.span;
+  const spanY = spanX / aspect;
+  const startX = view.centerX - spanX / 2;
+  const startY = view.centerY - spanY / 2;
+  const stepX = spanX / width;
+  const stepY = spanY / height;
+
+  let y = 0;
+  const rowsPerFrame = Math.max(1, Math.floor(18000 / width));
+
+  function drawChunk() {
+    if (requestId !== renderRequest) return;
+    const endY = Math.min(height, y + rowsPerFrame);
+
+    for (; y < endY; y++) {
+      const ci = startY + y * stepY;
+      for (let x = 0; x < width; x++) {
+        const cr = startX + x * stepX;
+        let zr = 0;
+        let zi = 0;
+        let iteration = 0;
+
+        while (zr * zr + zi * zi <= 256 && iteration < maxIterations) {
+          const nextZr = zr * zr - zi * zi + cr;
+          zi = 2 * zr * zi + ci;
+          zr = nextZr;
+          iteration++;
+        }
+
+        const offset = (y * width + x) * 4;
+        if (iteration === maxIterations) {
+          pixels[offset] = 7;
+          pixels[offset + 1] = 9;
+          pixels[offset + 2] = 17;
+        } else {
+          const magnitude = Math.sqrt(zr * zr + zi * zi);
+          const smooth = iteration + 1 - Math.log2(Math.max(1, Math.log2(magnitude)));
+          const colorIndex = ((Math.floor(smooth * 7) % 256) + 256) % 256;
+          const color = palette[colorIndex];
+          pixels[offset] = color[0];
+          pixels[offset + 1] = color[1];
+          pixels[offset + 2] = color[2];
+        }
+        pixels[offset + 3] = 255;
+      }
+    }
+
+    ctx.putImageData(image, 0, 0);
+    if (y < height) requestAnimationFrame(drawChunk);
+    else loading.classList.remove("visible");
+  }
+
+  requestAnimationFrame(drawChunk);
+}
+
+function updateZoomLabel() {
+  zoomValue.textContent = `${(3.5 / view.span).toFixed(2)}×`;
+}
+
+function zoomAt(clientX, clientY, factor) {
+  const rect = canvas.getBoundingClientRect();
+  const aspect = canvas.width / canvas.height;
+  const spanY = view.span / aspect;
+  const xFraction = (clientX - rect.left) / rect.width;
+  const yFraction = (clientY - rect.top) / rect.height;
+  const pointX = view.centerX + (xFraction - 0.5) * view.span;
+  const pointY = view.centerY + (yFraction - 0.5) * spanY;
+
+  view.span = Math.max(1e-12, Math.min(7, view.span * factor));
+  const newSpanY = view.span / aspect;
+  view.centerX = pointX - (xFraction - 0.5) * view.span;
+  view.centerY = pointY - (yFraction - 0.5) * newSpanY;
+  updateZoomLabel();
+  render();
+}
+
+slider.addEventListener("input", () => {
+  maxIterations = Number(slider.value);
+  iterationValue.value = maxIterations;
+  iterationValue.textContent = maxIterations;
+  render();
+});
+
+resetButton.addEventListener("click", () => {
+  view.centerX = -0.5;
+  view.centerY = 0;
+  view.span = 3.5;
+  updateZoomLabel();
+  render();
+});
+
+canvas.addEventListener("wheel", (event) => {
+  event.preventDefault();
+  zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 0.8 : 1.25);
+}, { passive: false });
+
+canvas.addEventListener("dblclick", (event) => zoomAt(event.clientX, event.clientY, 0.5));
+
+const resizeObserver = new ResizeObserver(resizeCanvas);
+resizeObserver.observe(canvas);
+updateZoomLabel();
+resizeCanvas();
