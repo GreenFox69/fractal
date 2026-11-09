@@ -7,6 +7,8 @@
   const resetBtn = document.getElementById("reset-btn");
   const coordsEl = document.getElementById("coords");
   const scaleEl = document.getElementById("scale");
+  const zoomInBtn = document.getElementById("zoom-in");
+  const zoomOutBtn = document.getElementById("zoom-out");
 
   let width = 0;
   let height = 0;
@@ -20,6 +22,7 @@
 
   let renderId = null;
   let pending = false;
+  let lastWheelTime = 0;
 
   function resize() {
     const rect = canvas.parentElement.getBoundingClientRect();
@@ -90,6 +93,7 @@
       console.error("Render error:", e);
     }
   }
+
   function updateUI() {
     if (iterValue) iterValue.textContent = maxIter;
     if (coordsEl) coordsEl.textContent = cx.toFixed(3) + ", " + cy.toFixed(3);
@@ -106,6 +110,34 @@
     });
   }
 
+  function zoomToPoint(nx, ny, factor) {
+    if (!width || !height) return;
+    const aspect = width / height;
+    const oldViewW = 3.5 / zoom;
+    const oldViewH = oldViewW / aspect;
+
+    const wx = cx - oldViewW / 2 + nx * oldViewW;
+    const wy = cy - oldViewH / 2 + ny * oldViewH;
+
+    let newZoom = zoom * factor;
+    if (newZoom < 0.1) newZoom = 0.1;
+    if (newZoom > 2000) newZoom = 2000;
+
+    const newViewW = 3.5 / newZoom;
+    const newViewH = newViewW / aspect;
+
+    cx = wx - newViewW / 2 + nx * newViewW;
+    cy = wy - newViewH / 2 + ny * newViewH;
+
+    if (!isFinite(cx) || !isFinite(cy)) {
+      cx = -0.5;
+      cy = 0.0;
+      zoom = 1.0;
+    }
+
+    zoom = newZoom;
+    requestRender();
+  }
   canvas.addEventListener("mousedown", (e) => {
     isDragging = true;
     lastMouse = { x: e.clientX, y: e.clientY };
@@ -117,11 +149,14 @@
     const dx = e.clientX - lastMouse.x;
     const dy = e.clientY - lastMouse.y;
     lastMouse = { x: e.clientX, y: e.clientY };
+
     const aspect = width / height;
     const viewW = 3.5 / zoom;
     const viewH = viewW / aspect;
+
     cx -= (dx / width) * viewW;
     cy += (dy / height) * viewH;
+
     requestRender();
   });
 
@@ -133,24 +168,26 @@
   canvas.addEventListener("wheel", (e) => {
     e.preventDefault();
     if (!width || !height) return;
+
+    const now = Date.now();
+    if (now - lastWheelTime < 40) return;
+    lastWheelTime = now;
+
+    const delta = e.deltaY;
+    if (Math.abs(delta) < 8) return;
+
     const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const delta = -e.deltaY * 0.001;
-    let newZoom = zoom * (1 + delta);
-    if (newZoom < 0.1) newZoom = 0.1;
-    if (newZoom > 2000) newZoom = 2000;
-    const aspect = width / height;
-    const oldViewW = 3.5 / zoom;
-    const oldViewH = oldViewW / aspect;
-    const newViewW = 3.5 / newZoom;
-    const newViewH = newViewW / aspect;
-    const worldX = cx - oldViewW / 2 + (mouseX / rect.width) * oldViewW;
-    const worldY = cy - oldViewH / 2 + (mouseY / rect.height) * oldViewH;
-    cx = worldX - newViewW / 2 + (mouseX / rect.width) * newViewW;
-    cy = worldY - newViewH / 2 + (mouseY / rect.height) * newViewH;
-    zoom = newZoom;
-    requestRender();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const nx = rect.width > 0 ? mx / rect.width : 0;
+    const ny = rect.height > 0 ? my / rect.height : 0;
+
+    const dir = delta > 0 ? 1 : -1;
+    let factor = 1.0 + dir * 0.18;
+    if (factor > 1.35) factor = 1.35;
+    if (factor < 0.74) factor = 0.74;
+
+    zoomToPoint(nx, ny, factor);
   }, { passive: false });
 
   iterInput.addEventListener("input", () => {
@@ -165,6 +202,41 @@
     maxIter = 100;
     iterInput.value = "100";
     requestRender();
+  });
+
+  zoomInBtn.addEventListener("click", () => {
+    const rect = canvas.getBoundingClientRect();
+    const nx = rect.width > 0 ? 0.5 : 0;
+    const ny = rect.height > 0 ? 0.5 : 0;
+    zoomToPoint(nx, ny, 1.3);
+  });
+
+  zoomOutBtn.addEventListener("click", () => {
+    const rect = canvas.getBoundingClientRect();
+    const nx = rect.width > 0 ? 0.5 : 0;
+    const ny = rect.height > 0 ? 0.5 : 0;
+    zoomToPoint(nx, ny, 0.77);
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "+" || e.key === "=") {
+      const rect = canvas.getBoundingClientRect();
+      const nx = rect.width > 0 ? 0.5 : 0;
+      const ny = rect.height > 0 ? 0.5 : 0;
+      zoomToPoint(nx, ny, 1.3);
+    } else if (e.key === "-") {
+      const rect = canvas.getBoundingClientRect();
+      const nx = rect.width > 0 ? 0.5 : 0;
+      const ny = rect.height > 0 ? 0.5 : 0;
+      zoomToPoint(nx, ny, 0.77);
+    } else if (e.key === "Escape" || e.key === "r" || e.key === "R") {
+      cx = -0.5;
+      cy = 0.0;
+      zoom = 1.0;
+      maxIter = 100;
+      iterInput.value = "100";
+      requestRender();
+    }
   });
 
   window.addEventListener("resize", () => {
