@@ -1,54 +1,42 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Множество Мандельброта</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="script.js" defer></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mandelbrot Fractal</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main class="app">
-    <header class="topbar glass">
-      <a class="brand" href="#" aria-label="Множество Мандельброта">
-        <span class="brand-mark">✳</span><span>fract<span class="brand-accent">al</span></span>
-      </a>
-      <span class="topbar-note"><span class="status-dot"></span> Интерактивная визуализация</span>
+  <div class="app">
+    <header class="glass">
+      <h1>Mandelbrot <span class="accent">Fractal</span></h1>
+      <p>Фрактал Мандельброта · отрисовка в браузере</p>
     </header>
 
-    <section class="intro">
-      <p class="eyebrow">КОМПЛЕКСНАЯ ПЛОСКОСТЬ</p>
-      <h1>Множество <span>Мандельброта</span></h1>
-      <p class="description">Бесконечная сложность в простой формуле. Исследуйте границы фрактала: прокручивайте колесо для масштаба и нажмите «Сбросить», чтобы вернуться.</p>
-    </section>
+    <div class="stage glass">
+      <canvas id="mandelbrot" aria-label="Mandelbrot fractal"></canvas>
+      <div class="hint">Перетаскивайте мышкой • Колёсико — зум</div>
+    </div>
 
-    <section class="workspace glass" aria-label="Настройки и изображение фрактала">
-      <div class="toolbar">
-        <div class="control-group">
-          <label for="iterations">
-            <span class="control-label">Точность отрисовки</span>
-            <span class="iteration-value"><output id="iterationValue">180</output> <small>итераций</small></span>
-          </label>
-          <input id="iterations" type="range" min="40" max="600" step="10" value="180">
-          <div class="range-labels"><span>Быстрее</span><span>Детальнее</span></div>
-        </div>
-        <div class="toolbar-actions">
-          <span class="zoom-readout">Масштаб <strong id="zoomValue">1.00×</strong></span>
-          <button id="resetButton" class="reset-button" type="button"><span aria-hidden="true">↺</span> Сбросить</button>
-        </div>
+    <div class="controls glass">
+      <div class="control-group">
+        <label for="iterations">
+          Точность (макс. итерации): <span id="iterations-value">100</span>
+        </label>
+        <input type="range" id="iterations" min="10" max="2000" value="100" />
       </div>
-      <div class="canvas-frame">
-        <canvas id="fractal" aria-label="Визуализация множества Мандельброта">Ваш браузер не поддерживает элемент canvas.</canvas>
-        <div id="loading" class="loading" aria-live="polite">Вычисляем фрактал…</div>
-        <div class="canvas-hint"><span>⌖</span> Колесо мыши — масштаб</div>
+
+      <div class="control-group">
+        <button id="reset-btn" type="button">Сбросить вид</button>
       </div>
-      <footer class="workspace-footer">
-        <span><i class="legend-dot"></i> Внутри множества</span>
-        <span class="formula">z<sub>n+1</sub> = z<sub>n</sub><sup>2</sup> + c</span>
-        <span>c = x + yi</span>
-      </footer>
-    </section>
-    <footer class="page-footer">Создано для любопытства <span>✦</span></footer>
-  </main>
+
+      <div class="info">
+        <div><span class="label">Центр:</span> <span id="coords">-0.50, 0.00</span></div>
+        <div><span class="label">Масштаб:</span> <span id="scale">1.00×</span></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
